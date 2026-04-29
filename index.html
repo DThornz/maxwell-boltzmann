@@ -1,0 +1,955 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maxwell–Boltzmann Simulator | A.Mirza</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@300;400;500&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#f5f6f8; --bg2:#fff; --bg3:#eef0f4;
+      --border:#d0d6e0; --border2:#e2e8f0;
+      --teal:#0b7a6e; --teal-glow:rgba(11,122,110,0.07);
+      --text:#1a202c; --muted:#374151; --dim:#6b7280;
+      --sans:'DM Sans',system-ui,sans-serif;
+      --mono:'DM Mono','JetBrains Mono',monospace;
+      --serif:'DM Serif Display',Georgia,serif;
+      --tr:.18s;
+      --blue:#2563eb; --blue-light:#eff6ff;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-top: 44px; /* nav height */
+    }
+
+    /* ── Site nav ── */
+    .site-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      height: 44px;
+      background: rgba(245,246,248,.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px; padding: 0 24px;
+    }
+    .site-nav-logo { font-family: var(--mono); font-size: .8em; color: var(--teal); font-weight: 500; letter-spacing: .04em; margin-right: auto; white-space: nowrap; text-decoration: none; }
+    .site-nav-logo span { color: var(--dim); }
+    .site-nav-link { padding: 5px 12px; border-radius: 6px; font-size: .77em; color: var(--muted); text-decoration: none; transition: all var(--tr); border: 1px solid transparent; font-family: var(--sans); white-space: nowrap; }
+    .site-nav-link:hover { color: var(--teal); background: var(--teal-glow); border-color: rgba(11,122,110,.15); }
+    .site-nav-link.curr { color: var(--teal); background: var(--teal-glow); border-color: rgba(11,122,110,.2); font-weight: 600; }
+
+    /* ── Gear button ── */
+    .acc-btn { position:fixed;bottom:22px;right:22px;z-index:9100;width:38px;height:38px;border-radius:50%;background:#0b7a6e;color:#fff;border:none;cursor:pointer;font-size:1em;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.2);transition:transform .2s; }
+    .acc-btn:hover { transform:scale(1.1); }
+    .acc-panel { position:fixed;bottom:70px;right:22px;z-index:9100;width:220px;padding:16px 18px 12px;border-radius:12px;border:1px solid #d4d9e8;background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.13);opacity:0;transform:translateY(8px) scale(.97);pointer-events:none;transition:all .2s cubic-bezier(.4,0,.2,1); }
+    .acc-panel.open { opacity:1;transform:translateY(0) scale(1);pointer-events:all; }
+    .acc-panel-title { font-size:.77em;font-weight:600;margin-bottom:13px;color:#1a202c; }
+    .acc-row { margin-bottom:12px; }
+    .acc-row-label { font-size:.65em;text-transform:uppercase;letter-spacing:.1em;color:#9ca3af;margin-bottom:6px; }
+    .acc-toggle-row { display:flex;align-items:center;justify-content:space-between; }
+    .acc-toggle-label { font-size:.81em;color:#4a5568; }
+    .acc-switch { position:relative;width:38px;height:20px;flex-shrink:0; }
+    .acc-switch input { opacity:0;width:0;height:0; }
+    .acc-slider { position:absolute;inset:0;background:#d1d5db;border-radius:99px;cursor:pointer;transition:background .18s; }
+    .acc-slider::before { content:'';position:absolute;width:14px;height:14px;border-radius:50%;left:3px;top:3px;background:#fff;transition:transform .18s; }
+    .acc-switch input:checked + .acc-slider { background:#0b7a6e; }
+    .acc-switch input:checked + .acc-slider::before { transform:translateX(18px); }
+    .acc-btn-group { display:flex;gap:4px; }
+    .acc-opt { flex:1;padding:4px;border:1px solid #d4d9e8;border-radius:5px;background:#f5f6f8;color:#718096;font-size:.72em;cursor:pointer;text-align:center;transition:all .15s;font-family:inherit;line-height:1.4; }
+    .acc-opt:hover { color:#0b7a6e;border-color:#0b7a6e;background:rgba(11,122,110,.06); }
+    .acc-opt.active { color:#0b7a6e;border-color:#0b7a6e;background:rgba(11,122,110,.08);font-weight:600; }
+
+    /* ── Page layout ── */
+    .page-wrap { max-width: 1320px; margin: 0 auto; padding: 32px 24px 60px; }
+
+    /* ── Hero ── */
+    .hero { margin-bottom: 32px; }
+    .hero h1 { font-family: var(--serif); font-size: 2.4em; font-weight: 400; color: var(--text); margin-bottom: 6px; }
+    .hero-sub { color: var(--dim); font-size: .95em; line-height: 1.6; max-width: 700px; }
+
+    /* ── Equation box ── */
+    .eq-box {
+      background: #f8fafc;
+      border-left: 4px solid var(--blue);
+      padding: 18px 24px;
+      border-radius: 0 16px 16px 0;
+      margin-bottom: 28px;
+    }
+    .eq-box-title { font-weight: 600; font-size: .95em; color: var(--text); margin-bottom: 12px; }
+    .eq-latex { font-size: 1.15rem; margin: 8px 0 16px; overflow-x: auto; }
+    .eq-params { display: grid; grid-template-columns: auto 1fr; gap: 5px 16px; color: var(--muted); font-size: .88em; margin-bottom: 12px; }
+    .eq-speeds { display: flex; flex-wrap: wrap; gap: 12px 32px; margin: 12px 0 8px; }
+    .eq-speed-item { font-size: .9em; color: var(--text); }
+    .eq-note { font-size: .85em; color: var(--dim); margin-top: 10px; border-top: 1px solid var(--border2); padding-top: 10px; }
+
+    /* ── Sim grid ── */
+    .sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px; align-items: stretch; }
+    @media (max-width: 900px) { .sim-grid { grid-template-columns: 1fr; } }
+
+    .panel { background: #fff; border-radius: 20px; border: 1px solid var(--border2); padding: 18px; display: flex; flex-direction: column; }
+    .panel-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+    .panel-title { font-weight: 600; font-size: 1.05em; color: var(--text); }
+    .panel-badge { background: #eef2ff; color: var(--blue); padding: 4px 14px; border-radius: 40px; font-weight: 500; font-size: .85em; }
+
+    #simCanvas { display: block; width: 100%; aspect-ratio: 1/1; background: #0b1120; border-radius: 14px; border: 1px solid #334155; }
+    .canvas-caption { margin-top: 10px; font-size: .82em; color: var(--dim); display: flex; gap: 16px; flex-wrap: wrap; }
+
+    #chartContainer { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    canvas#chart { width: 100% !important; background: #fafcff; border-radius: 12px; flex: 1 1 auto; min-height: 0; }
+    .chart-note { margin-top: 10px; padding: 10px 14px; background: #f1f5f9; border-radius: 10px; font-size: .83em; color: var(--muted); text-align: center; }
+
+    /* ── Stats bar ── */
+    .stats-bar { display: flex; flex-wrap: wrap; gap: 12px 24px; background: #f1f5f9; padding: 14px 24px; border-radius: 40px; margin: 16px 0 20px; align-items: center; }
+    .stat-item { display: flex; align-items: baseline; gap: 8px; flex-shrink: 0; min-width: 140px; }
+    .stat-label { font-weight: 500; color: var(--muted); text-transform: uppercase; font-size: .78em; }
+    .stat-value { font-weight: 700; font-size: 1.15em; color: var(--text); background: white; padding: 2px 10px; border-radius: 40px; min-width: 120px; text-align: center; font-family: 'DM Mono', monospace; font-variant-numeric: tabular-nums; display: inline-block; }
+    .stat-unit { font-size: .78em; color: var(--dim); }
+
+    /* ── Controls ── */
+    .controls-wrap { display: flex; flex-direction: column; gap: 14px; }
+    .slider-row { display: flex; align-items: center; justify-content: center; gap: 28px; background: #f8fafc; padding: 12px 20px; border-radius: 48px; flex-wrap: wrap; }
+    .slider-item { display: flex; align-items: center; gap: 10px; }
+    .slider-item label { font-weight: 500; color: var(--text); font-size: .9em; min-width: 130px; }
+    .slider-item input[type=range] { accent-color: var(--teal); }
+    .action-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center; }
+    .btn { background: white; border: 1px solid var(--border); padding: 9px 18px; border-radius: 40px; font-weight: 500; font-size: .88em; color: var(--text); cursor: pointer; transition: all .15s; font-family: var(--sans); }
+    .btn:hover { background: #f8fafc; border-color: #94a3b8; transform: translateY(-1px); }
+    .btn-primary { background: var(--blue); border-color: var(--blue); color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-blue { border-color: #bfdbfe; background: var(--blue-light); color: #1e40af; }
+    .energy-ctrl { display: flex; align-items: center; gap: 4px; background: white; border: 1px solid var(--border); border-radius: 40px; padding: 2px; }
+    .energy-btn { background: transparent; border: none; font-size: 1.4rem; font-weight: 600; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 40px; color: var(--text); }
+    .energy-btn:hover { background: var(--border2); }
+    .energy-lbl { padding: 0 8px; font-weight: 500; font-size: .88em; }
+
+    /* ── Theory section ── */
+    .theory { margin-top: 36px; background: #fafcff; border-radius: 20px; padding: 24px 28px; border: 1px solid var(--border2); }
+    .theory h2 { font-family: var(--serif); font-size: 1.7em; font-weight: 400; color: var(--text); margin: 0 0 18px; padding-bottom: 10px; border-bottom: 2px solid var(--border2); }
+    .theory h3 { font-size: 1.1em; font-weight: 600; color: var(--text); margin: 22px 0 10px; }
+    .theory p { line-height: 1.75; color: var(--muted); margin-bottom: 14px; }
+    .theory p strong { color: var(--text); }
+
+    .history-row { display: flex; gap: 28px; align-items: flex-start; }
+    .history-text { flex: 2; }
+    .portraits { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 170px; }
+    .portrait { text-align: center; background: white; border-radius: 14px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.05); border: 1px solid var(--border2); }
+    .portrait img { width: 100%; max-width: 150px; border-radius: 10px; }
+    .portrait figcaption { margin-top: 7px; font-size: .82em; color: var(--dim); line-height: 1.4; }
+
+    .theory-img { text-align: center; margin: 24px 0; }
+    .theory-img img { max-width: 55%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+    .theory-img figcaption { margin-top: 8px; font-size: .83em; color: var(--dim); }
+    .gas-diagram { text-align: center; margin-top: 24px; }
+    .gas-diagram img { max-width: 70%; border-radius: 12px; }
+
+    .deriv-box { background: #f1f5f9; border-radius: 14px; padding: 22px; margin-top: 18px; }
+    .deriv-box ol { margin-left: 20px; }
+    .deriv-box li { margin-bottom: 18px; line-height: 1.75; color: var(--muted); }
+    .deriv-box li strong { color: var(--text); }
+
+    .refs { margin-top: 22px; padding: 16px; background: #f8fafc; border-radius: 12px; }
+    .refs h4 { font-weight: 600; margin-bottom: 12px; color: var(--text); font-size: .95em; }
+    .ref-item { margin-bottom: 7px; padding: 4px 4px 4px 22px; text-indent: -22px; font-size: .87em; line-height: 1.5; color: var(--muted); border-radius: 4px; transition: background .3s; }
+    .ref-highlight { background: #fef3c7 !important; }
+    sup a { color: var(--blue); font-weight: 600; text-decoration: none; cursor: pointer; }
+    sup a:hover { text-decoration: underline; }
+
+    .img-credit { font-size: .78em; color: var(--dim); margin-top: 18px; border-top: 1px solid var(--border2); padding-top: 10px; }
+    .footnote { margin-top: 20px; font-size: .83em; color: var(--dim); text-align: center; }
+
+    @media (max-width: 720px) {
+      .history-row { flex-direction: column; }
+      .portraits { flex-direction: row; flex-wrap: wrap; }
+    }
+  
+/* ── Nav dropdown ── */
+.nav-dropdown { position: relative; }
+.nav-dropdown-menu {
+  position: absolute; top: 100%; left: 50%;
+  background: rgba(255,255,255,.97); backdrop-filter: blur(16px);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.1);
+  min-width: 170px; padding: 6px;
+  padding-top: 12px;
+  margin-top: -6px;
+  opacity: 0; pointer-events: none;
+  transform: translateX(-50%) translateY(-4px);
+  transition: opacity .15s, transform .15s;
+  z-index: 9999;
+}
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown-menu:hover {
+  opacity: 1; pointer-events: all;
+  transform: translateX(-50%) translateY(0);
+}
+.nav-dropdown-item {
+  display: block; padding: 7px 14px; border-radius: 6px;
+  font-size: .77em; color: var(--muted); text-decoration: none;
+  font-family: var(--sans); white-space: nowrap;
+  transition: all .15s;
+}
+.nav-dropdown-item:hover { color: var(--teal); background: var(--teal-glow); }
+body.dark-mode .nav-dropdown-menu { background: rgba(10,22,40,.97); border-color: #1c3050; }
+
+    /* ── Accessibility: dark mode ── */
+    body.dark-mode {
+      --bg:#0d1117; --bg2:#0a1628; --bg3:#0f1e38;
+      --border:#1c3050; --border2:#2a3548;
+      --teal:#2dd4bf; --teal-glow:rgba(45,212,191,0.08);
+      --text:#e2e8f0; --muted:#8b98b0; --dim:#566478;
+      --blue:#60a5fa; --blue-light:#0f1e38;
+    }
+    body.dark-mode { background: var(--bg); color: var(--text); }
+    body.dark-mode .panel { background: var(--bg2); border-color: var(--border); }
+    body.dark-mode .eq-box { background: var(--bg2); }
+    body.dark-mode .stats-bar { background: var(--bg3); }
+    body.dark-mode .stat-value { background: var(--bg2); color: var(--text); }
+    body.dark-mode .btn { background: var(--bg2); border-color: var(--border2); color: var(--text); }
+    body.dark-mode .btn-primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+    body.dark-mode .btn-blue { background: var(--bg3); border-color: #334155; color: #93c5fd; }
+    body.dark-mode .slider-row { background: var(--bg3); }
+    body.dark-mode .chart-note { background: var(--bg3); color: var(--muted); }
+    body.dark-mode .theory { background: var(--bg2); border-color: var(--border); }
+    body.dark-mode .theory h2 { border-bottom-color: var(--border); }
+    body.dark-mode .theory p, body.dark-mode .theory li { color: var(--muted); }
+    body.dark-mode .deriv-box { background: var(--bg3); }
+    body.dark-mode .portrait { background: var(--bg3); border-color: var(--border); }
+    body.dark-mode .refs { background: var(--bg3); }
+    body.dark-mode .ref-item { color: var(--muted); }
+    body.dark-mode .energy-ctrl { background: var(--bg2); border-color: var(--border2); }
+    body.dark-mode .canvas-caption { color: var(--dim); }
+    body.dark-mode .panel-badge { background: var(--bg3); }
+
+    /* ── Accessibility: font size ── */
+    body.size-sm { font-size: 14px; }
+    body.size-md { font-size: 16px; }
+    body.size-lg { font-size: 18px; }
+
+    /* ── Accessibility: font style ── */
+    body.font-serif { font-family: var(--serif); }
+    body.font-mono  { font-family: var(--mono); }
+
+  </style>
+</head>
+<body>
+
+<!-- ── Site navigation ── -->
+<div class="site-nav">
+  <a class="site-nav-logo" href="https://dthornz.github.io/website-cv-tools/">A.Mirza <span>/</span> site</a>
+  <a class="site-nav-link" href="https://dthornz.github.io/website-cv-tools/">Home</a>
+  <a class="site-nav-link" href="https://dthornz.github.io/website-cv-tools/AsadMirza_CV.html">CV</a>
+  <div class="nav-dropdown">
+  <a class="site-nav-link curr" href="https://dthornz.github.io/website-cv-tools/projects.html">Projects ▾</a>
+  <div class="nav-dropdown-menu">
+    <a class="nav-dropdown-item" href="https://dthornz.github.io/hodgkin-huxley/">🧠 HH Neuron Model</a>
+    <a class="nav-dropdown-item" style="color:var(--teal);font-weight:600" href="#">⚛ MB Gas Simulator</a>
+    <a class="nav-dropdown-item" href="https://dthornz.github.io/lbm-cfd/">🌊 LBM CFD Simulator</a>
+    <a class="nav-dropdown-item" href="https://dthornz.github.io/eng-fea-cfd-calc/">⚙ FEA / CFD Calc</a>
+    <a class="nav-dropdown-item" href="https://dthornz.github.io/website-cv-tools/dissertation.html">📋 PhD Dissertation</a>
+    <a class="nav-dropdown-item" href="https://dthornz.github.io/academic-ref-validator/">📑 Reference Validator</a>
+  </div>
+</div>
+  </div>
+
+<!-- ── Gear button + panel ── -->
+<button class="acc-btn" id="acc-btn" onclick="accToggle()" title="Display Settings" aria-label="Display Settings">⚙</button>
+<div class="acc-panel" id="acc-panel">
+  <div class="acc-panel-title">⚙ Display Settings</div>
+  <div class="acc-row">
+    <div class="acc-row-label">Color Mode</div>
+    <div class="acc-toggle-row">
+      <span class="acc-toggle-label">Dark Mode</span>
+      <label class="acc-switch">
+        <input type="checkbox" id="acc-dark" onchange="accDark(this)">
+        <span class="acc-slider"></span>
+      </label>
+    </div>
+  </div>
+  <div class="acc-row">
+    <div class="acc-row-label">Font Size</div>
+    <div class="acc-btn-group">
+      <button class="acc-opt" id="acc-sm" onclick="accSize('sm')">Small</button>
+      <button class="acc-opt active" id="acc-md" onclick="accSize('md')">Medium</button>
+      <button class="acc-opt" id="acc-lg" onclick="accSize('lg')">Large</button>
+    </div>
+  </div>
+  <div class="acc-row">
+    <div class="acc-row-label">Font Style</div>
+    <div class="acc-btn-group">
+      <button class="acc-opt active" id="acc-f0" onclick="accFont(0)">Default</button>
+      <button class="acc-opt" id="acc-f1" onclick="accFont(1)">Serif</button>
+      <button class="acc-opt" id="acc-f2" onclick="accFont(2)">Mono</button>
+    </div>
+  </div>
+</div>
+
+<div class="page-wrap">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Maxwell–Boltzmann Gas Simulation (2D)</h1>
+    <p class="hero-sub">Interactive hard-disk molecular dynamics simulation. Elastic collisions drive the emergent speed distribution toward the theoretical Maxwell–Boltzmann curve.</p>
+  </div>
+
+  <!-- Equation box -->
+  <div class="eq-box">
+    <div class="eq-box-title">2D Maxwell–Boltzmann speed distribution:</div>
+    <div class="eq-latex">
+      \[ f(v) = \frac{m}{k_B T}\,v\,\exp\!\left(-\frac{m v^2}{2 k_B T}\right), \qquad v \ge 0 \]
+    </div>
+    <div class="eq-params">
+      <span><strong>\(f(v)\)</strong></span><span>Probability density for speed \(v\) (units: s/m), normalised so \(\int_0^\infty f(v)\,dv = 1\)</span>
+      <span><strong>\(m\)</strong></span><span>Particle mass — proton mass \(m_p = 1.67\times10^{-27}\) kg</span>
+      <span><strong>\(k_B\)</strong></span><span>Boltzmann constant \(= 1.381\times10^{-23}\) J K\(^{-1}\)</span>
+      <span><strong>\(T\)</strong></span><span>Absolute temperature (K) — inferred from \(\langle KE\rangle = k_B T\) (2D equipartition)</span>
+      <span><strong>\(v\)</strong></span><span>Speed magnitude (m/s)</span>
+    </div>
+    <div class="eq-speeds">
+      <span class="eq-speed-item"><strong>Most probable speed:</strong> \(v_p = \sqrt{k_B T/m}\)</span>
+      <span class="eq-speed-item"><strong>Mean speed:</strong> \(\langle v\rangle = \sqrt{\pi k_B T/2m}\)</span>
+      <span class="eq-speed-item"><strong>RMS speed:</strong> \(v_\text{rms} = \sqrt{2k_B T/m}\)</span>
+    </div>
+    <div class="eq-note">
+      In 2D the factor is \(v\) (not \(v^2\) as in 3D) because velocity-space "area" at speed \(v\) scales as the circumference \(2\pi v\). Elastic hard-disk collisions drive the empirical distribution toward this theoretical curve.
+    </div>
+  </div>
+
+  <!-- Simulation + chart -->
+  <div class="sim-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Particle motion</span>
+        <span class="panel-badge" id="particleCountDisplay">500 particles</span>
+      </div>
+      <canvas id="simCanvas" width="600" height="600"></canvas>
+      <div class="canvas-caption">
+        <span>Each dot = one molecule</span>
+        <span>Hard-disk elastic collisions</span>
+        <span>Color encodes speed</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Speed distribution</span>
+        <span style="font-size:.82em;color:var(--dim)">Histogram · Running avg · Theory</span>
+      </div>
+      <div id="chartContainer">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="chart-note">
+        <strong>Chart key:</strong> Green bars = current histogram. Red line = running average (converges as collisions equilibrate). Gray dashed = theoretical 2D Maxwell–Boltzmann curve. Y-axis: probability density (s/m).
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-item"><span class="stat-label">Avg speed</span><span class="stat-value" id="avgSpeedDisplay">— ± —</span><span class="stat-unit">m/s</span></div>
+    <div class="stat-item"><span class="stat-label">RMS speed</span><span class="stat-value" id="rmsSpeedDisplay">—</span><span class="stat-unit">m/s</span></div>
+    <div class="stat-item"><span class="stat-label">Temperature</span><span class="stat-value" id="tempDisplay">—</span><span class="stat-unit">K</span></div>
+    <div class="stat-item"><span class="stat-label">Avg KE</span><span class="stat-value" id="avgKEDisplay">—</span><span class="stat-unit">zJ</span></div>
+    <div class="stat-item"><span class="stat-label">v<sub>p</sub> (theory)</span><span class="stat-value" id="vpDisplay">—</span><span class="stat-unit">m/s</span></div>
+    <div class="stat-item"><span class="stat-label">Steps</span><span class="stat-value" id="stepCounter">0</span></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls-wrap">
+    <div class="slider-row">
+      <div class="slider-item">
+        <label for="particleCountSlider">Particles:</label>
+        <input type="range" id="particleCountSlider" min="50" max="2000" value="500" step="25">
+        <span id="particleCountValue">500</span>
+      </div>
+      <div class="slider-item">
+        <label for="speedScaleSlider">Init. speed (m/s):</label>
+        <input type="range" id="speedScaleSlider" min="100" max="3000" value="800" step="50">
+        <span id="speedScaleValue">800</span>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-primary" id="resetButton">↺ Reset</button>
+      <button class="btn" id="pauseButton">⏸ Pause</button>
+      <button class="btn" id="reshuffleButton">🔀 Reshuffle</button>
+      <button class="btn btn-blue" id="restoreDefaultsButton">Restore defaults</button>
+      <div class="energy-ctrl">
+        <button class="energy-btn" id="decreaseEnergyBtn" title="Cool down (×0.85)">−</button>
+        <span class="energy-lbl">Thermal energy</span>
+        <button class="energy-btn" id="increaseEnergyBtn" title="Heat up (×1.18)">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theory section -->
+  <div class="theory">
+    <h2>Background &amp; History</h2>
+    <div class="history-row">
+      <div class="history-text">
+        <p>
+          The Maxwell–Boltzmann distribution describes the statistical distribution of molecular speeds in an ideal gas at thermodynamic equilibrium. It was first derived by Scottish physicist <strong>James Clerk Maxwell</strong> in 1859–1860 using purely probabilistic arguments<sup><a href="#ref1" onclick="highlightRef('ref1')">[1]</a></sup>. Maxwell assumed that the three Cartesian velocity components were statistically independent and normally distributed — an assumption he justified by the isotropy of space — which led directly to the speed distribution bearing his name.
+        </p>
+        <p>
+          Austrian physicist <strong>Ludwig Boltzmann</strong> substantially deepened the theory in 1872, deriving the distribution from first principles via his celebrated <em>H</em>-theorem and connecting it to the concept of entropy in statistical mechanics<sup><a href="#ref2" onclick="highlightRef('ref2')">[2]</a></sup>. Boltzmann showed that the Maxwell distribution is the unique equilibrium distribution: any other initial distribution will evolve toward it through molecular collisions, provided the gas is sufficiently dilute (the <em>Stosszahlansatz</em>, or "molecular chaos" assumption).
+        </p>
+        <p>
+          The combined Maxwell–Boltzmann framework applies to <strong>classical ideal gases</strong> — dilute collections of point-like particles that interact only through brief elastic collisions<sup><a href="#ref3" onclick="highlightRef('ref3')">[3]</a></sup>. It fails for quantum gases (where Fermi–Dirac or Bose–Einstein statistics apply) and for dense liquids (where intermolecular forces are always present). Within its domain of validity, it is a cornerstone of the <strong>kinetic theory of gases</strong>, explaining macroscopic properties — pressure, temperature, viscosity, diffusion, and thermal conductivity — from microscopic molecular motion<sup><a href="#ref4" onclick="highlightRef('ref4')">[4]</a></sup>.
+        </p>
+        <p>
+          The 2D version derived here is relevant to surface physics, thin-film adsorption layers, and 2D electron gases, and serves as an excellent pedagogical simplification of the full 3D theory.
+        </p>
+      </div>
+      <div class="portraits">
+        <div class="portrait">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/James-Clerk-Maxwell-1831-1879.jpg/250px-James-Clerk-Maxwell-1831-1879.jpg" alt="James Clerk Maxwell">
+          <figcaption>James Clerk Maxwell (1831–1879)<br>Source: Wikimedia Commons</figcaption>
+        </div>
+        <div class="portrait">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/c/c3/Boltzmann_age31.jpg" alt="Ludwig Boltzmann">
+          <figcaption>Ludwig Boltzmann (1844–1906)<br>Source: Wikimedia Commons</figcaption>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory-img">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/d/d9/Maxwell-Boltzmann_distribution.png" alt="Maxwell–Boltzmann distribution curves">
+      <figcaption>
+        Figure 1: Maxwell–Boltzmann probability density for several temperatures (3D). The distribution shifts right and flattens as temperature rises<sup><a href="#ref5" onclick="highlightRef('ref5')">[5]</a></sup>. Source: <a href="https://commons.wikimedia.org/wiki/File:Maxwell-Boltzmann_distribution.png" target="_blank">Wikimedia Commons</a> (CC BY-SA 3.0).
+      </figcaption>
+    </div>
+
+    <div class="gas-diagram">
+      <h3>The Ideal Gas Model</h3>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Translational_motion.gif" alt="Ideal gas translational motion">
+      <figcaption style="margin-top:8px;font-size:.83em;color:var(--dim)">
+        Figure 2: Ideal gas particles undergoing random translational motion and elastic collisions<sup><a href="#ref3" onclick="highlightRef('ref3')">[3]</a></sup>. Source: <a href="https://commons.wikimedia.org/wiki/File:Translational_motion.gif" target="_blank">Wikimedia Commons</a> (public domain).
+      </figcaption>
+    </div>
+
+    <h2 style="margin-top:32px">Derivation from First Principles (2D)</h2>
+    <p style="margin-bottom:0">For a two-dimensional ideal gas at temperature \(T\), the speed distribution can be derived in four steps using statistical mechanics and coordinate geometry<sup><a href="#ref6" onclick="highlightRef('ref6')">[6]</a></sup>:</p>
+    <div class="deriv-box">
+      <ol>
+        <li>
+          <strong>Independent Gaussian velocity components (Maxwell's postulate):</strong><br>
+          In thermal equilibrium, the probability density for each velocity component \(v_x\) and \(v_y\) is independent and Gaussian with zero mean. This follows from the Boltzmann factor \(e^{-E/k_BT}\) applied to the kinetic energy \(E = \tfrac{1}{2}m v_x^2\) of each degree of freedom<sup><a href="#ref1" onclick="highlightRef('ref1')">[1]</a></sup>:
+          \[
+          f(v_x) = \sqrt{\frac{m}{2\pi k_B T}}\exp\!\left(-\frac{m v_x^2}{2k_BT}\right),\qquad
+          f(v_y) = \sqrt{\frac{m}{2\pi k_B T}}\exp\!\left(-\frac{m v_y^2}{2k_BT}\right).
+          \]
+          Independence gives the joint density as the product:
+          \[
+          f(v_x,v_y) = \frac{m}{2\pi k_BT}\exp\!\left(-\frac{m(v_x^2+v_y^2)}{2k_BT}\right).
+          \]
+          This is already normalised: \(\iint f(v_x,v_y)\,dv_x\,dv_y = 1\). Physically, independence reflects the isotropy of space — there is no preferred direction in an equilibrium gas.
+        </li>
+        <li>
+          <strong>Polar coordinate transformation — from \((v_x,v_y)\) to \((v,\theta)\):</strong><br>
+          We seek the marginal distribution of the speed \(v = \sqrt{v_x^2+v_y^2}\). Writing \(v_x = v\cos\theta\) and \(v_y = v\sin\theta\), the Jacobian of the transformation is
+          \[
+          \left|\frac{\partial(v_x,v_y)}{\partial(v,\theta)}\right| = v,
+          \]
+          so \(dv_x\,dv_y = v\,dv\,d\theta\). Because \(f(v_x,v_y)\) depends only on \(v\) (it is isotropic), integrating over \(\theta\in[0,2\pi)\) gives:
+          \[
+          f(v)\,dv = \left[\int_0^{2\pi} \frac{m}{2\pi k_BT}\exp\!\left(-\frac{mv^2}{2k_BT}\right) v\,d\theta\right]dv = \frac{m}{k_BT}\,v\,\exp\!\left(-\frac{mv^2}{2k_BT}\right)dv.
+          \]
+          The factor of \(v\) (rather than \(v^2\) as in 3D) arises because the "boundary" of velocity space at radius \(v\) in 2D is a circle (perimeter \(2\pi v\)) rather than a sphere (surface area \(4\pi v^2\)).
+        </li>
+        <li>
+          <strong>Normalization verification:</strong><br>
+          Confirming \(\int_0^\infty f(v)\,dv = 1\):
+          \[
+          \int_0^\infty \frac{m}{k_BT}\,v\,e^{-mv^2/(2k_BT)}\,dv.
+          \]
+          Substituting \(u = mv^2/(2k_BT)\), \(du = (m/k_BT)\,v\,dv\):
+          \[
+          \int_0^\infty e^{-u}\,du = 1. \quad\checkmark
+          \]
+        </li>
+        <li>
+          <strong>Key characteristic speeds and equipartition:</strong><br>
+          The three characteristic speeds follow from moments of \(f(v)\):
+          <ul style="margin: 8px 0 8px 20px; line-height:1.9">
+            <li><strong>Most probable speed</strong> (peak of \(f\)): \(\displaystyle v_p = \sqrt{\frac{k_BT}{m}}\)</li>
+            <li><strong>Mean speed</strong>: \(\displaystyle\langle v\rangle = \int_0^\infty v\,f(v)\,dv = \sqrt{\frac{\pi k_BT}{2m}}\)</li>
+            <li><strong>RMS speed</strong>: \(\displaystyle v_\text{rms} = \sqrt{\langle v^2\rangle} = \sqrt{\frac{2k_BT}{m}}\)</li>
+          </ul>
+          Their ratio is \(v_p : \langle v\rangle : v_\text{rms} = 1 : \sqrt{\pi/2} : \sqrt{2} \approx 1 : 1.253 : 1.414\).<br><br>
+          The <strong>equipartition theorem</strong> states that each quadratic degree of freedom contributes \(\tfrac{1}{2}k_BT\) to the average energy. In 2D there are two translational degrees of freedom, so
+          \[
+          \langle KE\rangle = \tfrac{1}{2}m\langle v^2\rangle = \tfrac{1}{2}m\cdot\frac{2k_BT}{m} = k_BT,
+          \]
+          which gives the simulation's temperature estimate: \(T = \langle KE\rangle / k_B\).
+        </li>
+      </ol>
+      <p style="margin-top:14px;color:var(--muted);line-height:1.7">
+        This derivation, first completed by Maxwell using purely probabilistic reasoning in 1860, stands as one of the earliest applications of statistics to physics and remains a cornerstone of kinetic theory and statistical mechanics.
+      </p>
+    </div>
+
+    <!-- References -->
+    <div class="refs">
+      <h4>References</h4>
+      <div id="ref1" class="ref-item">[1] Maxwell, J. C. (1860). Illustrations of the dynamical theory of gases. <em>Philosophical Magazine</em>, 19(124), 19–32.</div>
+      <div id="ref2" class="ref-item">[2] Boltzmann, L. (1872). Weitere Studien über das Wärmegleichgewicht unter Gasmolekülen. <em>Sitzungsberichte der Kaiserlichen Akademie der Wissenschaften</em>, 66, 275–370.</div>
+      <div id="ref3" class="ref-item">[3] Cercignani, C. (1988). <em>The Boltzmann equation and its applications</em>. Springer-Verlag.</div>
+      <div id="ref4" class="ref-item">[4] Reif, F. (1965). <em>Fundamentals of statistical and thermal physics</em>. McGraw-Hill.</div>
+      <div id="ref5" class="ref-item">[5] Wikipedia contributors. (2024). Maxwell–Boltzmann distribution. <em>Wikipedia, The Free Encyclopedia</em>. Retrieved from https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution</div>
+      <div id="ref6" class="ref-item">[6] Brush, S. G. (1976). <em>The kind of motion we call heat: A history of the kinetic theory of gases in the 19th century</em>. North-Holland.</div>
+    </div>
+
+    <div class="img-credit">
+      <strong>Image credits:</strong> All images from Wikimedia Commons. James Clerk Maxwell portrait (public domain). Ludwig Boltzmann portrait (public domain). Maxwell–Boltzmann distribution plot (CC BY-SA 3.0). Ideal gas animation (public domain).
+    </div>
+  </div>
+
+  <p class="footnote">
+    Simulation: hard-disk 2D molecular dynamics with elastic wall reflections. Spatial hash grid O(N) collision detection. Histogram (green) and running average (red) are compared with the theoretical 2D Maxwell–Boltzmann curve (gray dashed) computed from the instantaneous mean kinetic energy. Units: length in nm, time in ps; 1 sim unit = 1000 m/s.
+  </p>
+</div>
+
+<!-- ─── Simulation JavaScript ─── -->
+<script>
+(function(){
+  "use strict";
+
+  // ── Physical constants ──────────────────────────────────────────
+  const MASS = 1.67e-27;          // proton mass (kg)
+  const KB   = 1.380649e-23;      // Boltzmann constant (J/K)
+  const SPEED_CONV = 1000;        // 1 sim-speed unit = 1000 m/s  (nm/ps = 1000 m/s)
+  const DT   = 1/60;              // time step (simulation units ≈ 1/60 ps)
+
+  // ── Simulation state ────────────────────────────────────────────
+  let N = 500;
+  let speedScale = 800;           // initial speed spread, m/s
+  const RADIUS = 0.005;           // particle radius, sim units
+
+  let pos = [], vel = [];
+  let step = 0, paused = false, animId = null;
+
+  // ── DOM refs ────────────────────────────────────────────────────
+  const simCanvas  = document.getElementById("simCanvas");
+  const ctx        = simCanvas.getContext("2d");
+  const avgSpeedEl = document.getElementById("avgSpeedDisplay");
+  const rmsSpeedEl = document.getElementById("rmsSpeedDisplay");
+  const tempEl     = document.getElementById("tempDisplay");
+  const avgKEEl    = document.getElementById("avgKEDisplay");
+  const vpEl       = document.getElementById("vpDisplay");
+  const stepEl     = document.getElementById("stepCounter");
+  const pCountDisp = document.getElementById("particleCountDisplay");
+  const pCountSldr = document.getElementById("particleCountSlider");
+  const pCountVal  = document.getElementById("particleCountValue");
+  const speedSldr  = document.getElementById("speedScaleSlider");
+  const speedVal   = document.getElementById("speedScaleValue");
+
+  // ── Histogram state ─────────────────────────────────────────────
+  const NBINS = 60;
+  let vmaxPhys = 1;               // x-axis right edge in m/s
+  let binEdges = [];              // bin centre positions in m/s
+  let histBins = new Array(NBINS).fill(0);   // current frame density (s/m)
+  let runAvg   = new Array(NBINS).fill(0);   // exponential running average
+  let runCount = 0;
+
+  // ── Chart setup ─────────────────────────────────────────────────
+  const chartCtx = document.getElementById("chart").getContext("2d");
+  const chart = new Chart(chartCtx, {
+    type: "bar",
+    data: {
+      labels: binEdges,
+      datasets: [
+        { label: "Histogram",    data: [...histBins], backgroundColor: "rgba(34,197,94,0.50)", borderColor: "#16a34a", borderWidth: 0.8, borderRadius: 3 },
+        { label: "Running avg",  type: "line", data: [...runAvg],   borderColor: "#dc2626", borderWidth: 2.5, pointRadius: 0, tension: 0.25 },
+        { label: "Theory (2D)",  type: "line", data: new Array(NBINS).fill(0), borderColor: "#64748b", borderWidth: 2.5, pointRadius: 0, borderDash: [8,4] }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { usePointStyle: true, boxWidth: 8 } } },
+      scales: {
+        x: { title: { display: true, text: "Speed (m/s)" }, grid: { color: "#e2e8f0" }, ticks: { maxTicksLimit: 10, maxRotation: 0 } },
+        y: { title: { display: true, text: "Probability density (s/m)" }, beginAtZero: true, grid: { color: "#e2e8f0" } }
+      }
+    }
+  });
+
+  // ── Bin grid update ─────────────────────────────────────────────
+  function setBinGrid(newVmaxPhys) {
+    vmaxPhys = Math.max(newVmaxPhys, 10);
+    binEdges = [];
+    for (let i = 0; i < NBINS; i++) {
+      binEdges.push( (vmaxPhys * (i + 0.5) / NBINS).toFixed(0) );
+    }
+    chart.data.labels = binEdges;
+  }
+
+  // ── Compute physical speeds ──────────────────────────────────────
+  function physSpeeds() {
+    const s = new Float64Array(N);
+    for (let i = 0; i < N; i++) {
+      const vx = vel[i][0], vy = vel[i][1];
+      s[i] = Math.sqrt(vx*vx + vy*vy) * SPEED_CONV;  // m/s
+    }
+    return s;
+  }
+
+  // ── Histogram + stats update ────────────────────────────────────
+  function updateHistAndStats() {
+    const speeds = physSpeeds();
+
+    // Adaptive x-axis: 99th percentile × 1.4
+    const sorted = [...speeds].sort((a,b)=>a-b);
+    const p99 = sorted[Math.floor(N * 0.99)] || 1;
+    const newVmax = Math.min(p99 * 1.4, 15000);
+    if (Math.abs(newVmax - vmaxPhys) / vmaxPhys > 0.08) setBinGrid(newVmax);
+
+    const binW = vmaxPhys / NBINS;   // m/s per bin
+
+    // Build histogram in physical units: density = count/(N·Δv)  [s/m]
+    histBins.fill(0);
+    for (const v of speeds) {
+      const idx = Math.floor(v / vmaxPhys * NBINS);
+      if (idx >= 0 && idx < NBINS) histBins[idx]++;
+    }
+    for (let i = 0; i < NBINS; i++) histBins[i] /= (N * binW);   // → s/m
+
+    // Running average (exponential, α = 1/runCount up to 200 frames)
+    runCount++;
+    const alpha = 1 / Math.min(runCount, 200);
+    for (let i = 0; i < NBINS; i++) {
+      runAvg[i] += alpha * (histBins[i] - runAvg[i]);
+    }
+
+    // Stats
+    let sumV = 0, sumV2 = 0;
+    for (const v of speeds) { sumV += v; sumV2 += v*v; }
+    const avgV   = sumV / N;
+    const rmsV   = Math.sqrt(sumV2 / N);
+    const avgKE  = 0.5 * MASS * (sumV2 / N);       // J
+    const T      = avgKE / KB;                       // 2D: <KE>=k_B*T
+    const vp     = Math.sqrt(KB * T / MASS);         // most probable speed
+    const variance = (sumV2/N) - avgV*avgV;
+    const stdDev = Math.sqrt(Math.max(0, variance));
+
+    avgSpeedEl.textContent = `${avgV.toFixed(0)} ± ${stdDev.toFixed(0)}`;
+    rmsSpeedEl.textContent = rmsV.toFixed(0);
+    tempEl.textContent     = T.toExponential(2);
+    avgKEEl.textContent    = (avgKE * 1e21).toFixed(2);
+    vpEl.textContent       = vp.toFixed(0);
+    stepEl.textContent     = step;
+
+    return { T };
+  }
+
+  // ── Theoretical MB curve ─────────────────────────────────────────
+  function updateTheory(T) {
+    if (!T || T <= 0) return;
+    const theo = new Array(NBINS);
+    let maxTheo = 0;
+    const kT = KB * T;
+    for (let i = 0; i < NBINS; i++) {
+      const v = vmaxPhys * (i + 0.5) / NBINS;   // m/s, bin centre
+      // f(v) = (m/k_B*T) * v * exp(-m*v^2 / (2*k_B*T))   [s/m]
+      const fv = (MASS / kT) * v * Math.exp(-MASS * v * v / (2 * kT));
+      theo[i] = fv;
+      if (fv > maxTheo) maxTheo = fv;
+    }
+    chart.data.datasets[0].data = [...histBins];
+    chart.data.datasets[1].data = [...runAvg];
+    chart.data.datasets[2].data = theo;
+    chart.options.scales.y.max = Math.max(maxTheo * 1.35, 1e-6);
+  }
+
+  // ── Spatial hash for O(N) collision detection ────────────────────
+  const CELL = 2 * RADIUS;           // cell size = particle diameter
+  let hashMap = new Map();
+
+  function buildHash() {
+    hashMap.clear();
+    for (let i = 0; i < N; i++) {
+      const cx = Math.floor(pos[i][0] / CELL);
+      const cy = Math.floor(pos[i][1] / CELL);
+      const key = `${cx},${cy}`;
+      if (!hashMap.has(key)) hashMap.set(key, []);
+      hashMap.get(key).push(i);
+    }
+  }
+
+  function handleCollisions() {
+    buildHash();
+    const diam2 = (2 * RADIUS) ** 2;
+    for (let i = 0; i < N; i++) {
+      const cx = Math.floor(pos[i][0] / CELL);
+      const cy = Math.floor(pos[i][1] / CELL);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const neighbors = hashMap.get(`${cx+dx},${cy+dy}`);
+          if (!neighbors) continue;
+          for (const j of neighbors) {
+            if (j <= i) continue;
+            const rx = pos[i][0] - pos[j][0];
+            const ry = pos[i][1] - pos[j][1];
+            const r2 = rx*rx + ry*ry;
+            if (r2 < diam2 && r2 > 1e-12) {
+              const dvx = vel[i][0] - vel[j][0];
+              const dvy = vel[i][1] - vel[j][1];
+              const dot = dvx*rx + dvy*ry;
+              if (dot < 0) {
+                const f = dot / r2;
+                vel[i][0] -= rx * f;  vel[i][1] -= ry * f;
+                vel[j][0] += rx * f;  vel[j][1] += ry * f;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function handleWalls() {
+    for (let i = 0; i < N; i++) {
+      if (pos[i][0] < RADIUS)        { pos[i][0] = RADIUS;      vel[i][0] = Math.abs(vel[i][0]); }
+      if (pos[i][0] > 1 - RADIUS)   { pos[i][0] = 1 - RADIUS;  vel[i][0] = -Math.abs(vel[i][0]); }
+      if (pos[i][1] < RADIUS)        { pos[i][1] = RADIUS;      vel[i][1] = Math.abs(vel[i][1]); }
+      if (pos[i][1] > 1 - RADIUS)   { pos[i][1] = 1 - RADIUS;  vel[i][1] = -Math.abs(vel[i][1]); }
+    }
+  }
+
+  function advancePositions() {
+    for (let i = 0; i < N; i++) {
+      pos[i][0] += vel[i][0] * DT;
+      pos[i][1] += vel[i][1] * DT;
+    }
+  }
+
+  // ── Rendering ───────────────────────────────────────────────────
+  function drawParticles() {
+    const W = simCanvas.width, H = simCanvas.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#0b1120";
+    ctx.fillRect(0, 0, W, H);
+
+    // Speed-based color: slow=blue, medium=teal, fast=red
+    const maxV = vmaxPhys / SPEED_CONV * 0.6;
+    for (let i = 0; i < N; i++) {
+      const vx = vel[i][0], vy = vel[i][1];
+      const spd = Math.sqrt(vx*vx + vy*vy);
+      const t = Math.min(spd / maxV, 1);
+      // Interpolate: blue(0) → teal(0.5) → red(1)
+      let r, g, b;
+      if (t < 0.5) {
+        const u = t * 2;
+        r = Math.round(30  + u * 11);
+        g = Math.round(100 + u * 122);
+        b = Math.round(200 - u * 78);
+      } else {
+        const u = (t - 0.5) * 2;
+        r = Math.round(41  + u * 175);
+        g = Math.round(222 - u * 172);
+        b = Math.round(122 - u * 110);
+      }
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.beginPath();
+      ctx.arc(pos[i][0] * W, pos[i][1] * H, 2.5, 0, 2*Math.PI);
+      ctx.fill();
+    }
+    ctx.strokeStyle = "#334155";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(0, 0, W, H);
+  }
+
+  // ── Initialization ───────────────────────────────────────────────
+  function initParticles(newN, scalePhys, keepStep) {
+    N = newN;
+    const scaleSim = scalePhys / SPEED_CONV;  // m/s → sim units
+    pos = []; vel = [];
+    // Place particles in a grid to avoid initial overlaps
+    const cols = Math.ceil(Math.sqrt(N));
+    const spacing = 1 / cols;
+    for (let i = 0; i < N; i++) {
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = (col + 0.5) * spacing;
+      const y = (row + 0.5) * spacing;
+      pos.push([
+        Math.min(Math.max(x, RADIUS), 1 - RADIUS),
+        Math.min(Math.max(y, RADIUS), 1 - RADIUS)
+      ]);
+      const theta = Math.random() * 2 * Math.PI;
+      const spd   = (0.3 + Math.random() * 0.7) * scaleSim; // uniform spread
+      vel.push([spd * Math.cos(theta), spd * Math.sin(theta)]);
+    }
+    if (!keepStep) {
+      step = 0;
+      runAvg.fill(0);
+      runCount = 0;
+      // Set initial vmax based on speed scale
+      setBinGrid(scalePhys * 2.5);
+    }
+    pCountDisp.textContent = `${N} particles`;
+    pCountVal.textContent  = N;
+    pCountSldr.value       = N;
+  }
+
+  function resetSimulation() {
+    initParticles(N, speedScale, false);
+    const { T } = updateHistAndStats();
+    updateTheory(T);
+    drawParticles();
+    chart.update();
+  }
+
+  function restoreDefaults() {
+    N = 500; speedScale = 800;
+    speedSldr.value = speedScale;
+    speedVal.textContent = speedScale;
+    resetSimulation();
+  }
+
+  function reshuffleParticles() {
+    initParticles(N, speedScale, true);
+    const { T } = updateHistAndStats();
+    updateTheory(T);
+    drawParticles();
+    chart.update();
+  }
+
+  function adjustEnergy(factor) {
+    for (let i = 0; i < N; i++) {
+      vel[i][0] *= factor;
+      vel[i][1] *= factor;
+    }
+    // Reset running average after energy change so it re-converges
+    runAvg.fill(0); runCount = 0;
+  }
+
+  // ── Animation loop ───────────────────────────────────────────────
+  function loop() {
+    if (!paused) {
+      advancePositions();
+      handleCollisions();
+      handleWalls();
+      const { T } = updateHistAndStats();
+      updateTheory(T);
+      chart.update();
+      drawParticles();
+      step++;
+    }
+    animId = requestAnimationFrame(loop);
+  }
+
+  // ── Controls ─────────────────────────────────────────────────────
+  function bindControls() {
+    document.getElementById("resetButton").addEventListener("click", resetSimulation);
+    document.getElementById("restoreDefaultsButton").addEventListener("click", restoreDefaults);
+    document.getElementById("reshuffleButton").addEventListener("click", reshuffleParticles);
+
+    const pauseBtn = document.getElementById("pauseButton");
+    pauseBtn.addEventListener("click", () => {
+      paused = !paused;
+      pauseBtn.textContent = paused ? "▶ Resume" : "⏸ Pause";
+    });
+
+    document.getElementById("increaseEnergyBtn").addEventListener("click", () => adjustEnergy(Math.sqrt(1.4)));
+    document.getElementById("decreaseEnergyBtn").addEventListener("click", () => adjustEnergy(Math.sqrt(0.7)));
+
+    pCountSldr.addEventListener("input", e => pCountVal.textContent = e.target.value);
+    pCountSldr.addEventListener("change", e => {
+      initParticles(parseInt(e.target.value), speedScale, false);
+      const { T } = updateHistAndStats(); updateTheory(T); drawParticles(); chart.update();
+    });
+
+    speedSldr.addEventListener("input", e => {
+      speedScale = parseFloat(e.target.value);
+      speedVal.textContent = speedScale;
+    });
+    speedSldr.addEventListener("change", () => resetSimulation());
+  }
+
+  // ── Citation highlight ────────────────────────────────────────────
+  window.highlightRef = function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ref-highlight");
+    setTimeout(() => el.classList.remove("ref-highlight"), 1800);
+  };
+
+  // ── KaTeX ─────────────────────────────────────────────────────────
+  function renderKatex() {
+    if (typeof renderMathInElement !== "undefined") {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false }
+        ],
+        throwOnError: false
+      });
+    }
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────
+  initParticles(N, speedScale, false);
+  bindControls();
+  const { T: T0 } = updateHistAndStats();
+  updateTheory(T0);
+  drawParticles();
+  chart.update();
+  loop();
+  window.addEventListener("load", renderKatex);
+  setTimeout(renderKatex, 300);
+  window.addEventListener("beforeunload", () => { if (animId) cancelAnimationFrame(animId); });
+})();
+</script>
+
+<!-- ── Accessibility IIFE ── -->
+<script>
+(function(){
+  var FONTS=['','font-serif','font-mono'];
+  var LS=window.localStorage;
+  function lsGet(k){try{return LS?LS.getItem(k):null;}catch(e){return null;}}
+  function lsSet(k,v){try{if(LS)LS.setItem(k,v);}catch(e){}}
+  function applyPrefs(){
+    var dark=lsGet('acc_dark')==='1';
+    var sz=lsGet('acc_sz')||'md';
+    var fi=parseInt(lsGet('acc_fi')||'0');
+    var b=document.body;
+    b.classList.toggle('dark-mode',dark);
+    b.classList.toggle('light-mode',!dark);
+    b.classList.remove('size-sm','size-md','size-lg');
+    b.classList.add('size-'+sz);
+    b.classList.remove('font-serif','font-mono');
+    if(FONTS[fi]) b.classList.add(FONTS[fi]);
+    var cb=document.getElementById('acc-dark');
+    if(cb) cb.checked=dark;
+    ['sm','md','lg'].forEach(function(s){
+      var el=document.getElementById('acc-'+s);
+      if(el) el.classList.toggle('active',s===sz);
+    });
+    [0,1,2].forEach(function(i){
+      var el=document.getElementById('acc-f'+i);
+      if(el) el.classList.toggle('active',i===fi);
+    });
+  }
+  window.accToggle=function(){var p=document.getElementById('acc-panel');if(p)p.classList.toggle('open');};
+  window.accDark=function(cb){lsSet('acc_dark',cb.checked?'1':'0');applyPrefs();};
+  window.accSize=function(s){lsSet('acc_sz',s);applyPrefs();};
+  window.accFont=function(i){lsSet('acc_fi',i);applyPrefs();};
+  document.addEventListener('click',function(e){
+    var p=document.getElementById('acc-panel');
+    var b2=document.getElementById('acc-btn');
+    if(p&&b2&&p.classList.contains('open')&&!p.contains(e.target)&&e.target!==b2)
+      p.classList.remove('open');
+  });
+  applyPrefs();
+  document.addEventListener('DOMContentLoaded',applyPrefs);
+})();
+</script>
+
+</body>
+</html>
